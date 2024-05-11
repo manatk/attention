@@ -63,7 +63,8 @@ def plot_attention(attentions, layer, threshold):
     points = [0 for i in range(seq_length)]
     attention_layer = attentions[layer].detach().numpy()
     sums = np.sum(attention_layer, 2)
-    np.putmask(sums, sums<threshold, 0)
+    sums = np.putmask(sums, sums<threshold, 0)
+    numpy.count_nonzero(sums, 2)
     for batch in range(batch_size):
         for head in range(num_heads):
             for seq_pos in range(seq_length):
