@@ -63,19 +63,10 @@ def plot_attention(attentions, layer, threshold):
     points = [0 for i in range(seq_length)]
     attention_layer = attentions[layer].detach().numpy()
     sums = np.sum(attention_layer, 2)
-    np.putmask(sums, sums<threshold, 0)
-    for batch in range(batch_size):
-        for head in range(num_heads):
-            for seq_pos in range(seq_length):
-                # Calculate the sum of attention values for the current word
-                attention_sum = np.sum(attention_layer[batch, head, :,seq_pos])
-                # Count the number of words with attention sum greater than 0.5
-                if attention_sum > threshold:
-                    points[seq_pos] += 1
-
-    # Separate x and y values for plotting
+    sums = np.putmask(sums, sums<threshold, 0)
+    counts = numpy.count_nonzero(sums, [0, 1, 3])
     x_values = [i for i in range(seq_length)]
-    y_values = points
+    y_values = counts
     # Plot the points
     plt.scatter(x_values, y_values)
     plt.xlabel('Position in Sequence')
