@@ -3,9 +3,8 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
+from datasets import load_dataset
 
-
-# Specify the path to your LLaMA 3 model
 model_path = "meta-llama/Meta-Llama-3-8B-Instruct"
 access_token = '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'
 
@@ -57,14 +56,14 @@ layer (int) - layer to choose
 threshold (float) - threshold for alpha value over which a word is said to be attended to
 '''
 def plot_attention(attentions, layer, threshold):
-    # Creating plot for first layer
+    # Creating plot for layer
     # Iterate through each batch, head, and sequence
     batch_size, num_heads, seq_length = attentions[0].size()[0], attentions[0].size()[1], attentions[0].size()[2]
     points = [0 for i in range(seq_length)]
     attention_layer = attentions[layer].detach().numpy()
     sums = np.sum(attention_layer, 2)
     sums = np.putmask(sums, sums<threshold, 0)
-    counts = numpy.count_nonzero(sums, [0, 1, 3])
+    counts = np.count_nonzero(sums, [0, 1, 3])
     x_values = [i for i in range(seq_length)]
     y_values = counts
     # Plot the points
@@ -77,28 +76,71 @@ def plot_attention(attentions, layer, threshold):
     plt.show()
 
 def main():
+    tokenizer = AutoTokenizer.from_pretrained(model_path, force_download=True, token=access_token)
+    tokenizer.pad_token = tokenizer.eos_token  # Ensure pad token is set if the model expects it
+    tokenizer.padding_side = "right"
+
+    model = AutoModelForCausalLM.from_pretrained(model_path, output_attentions=True, token=access_token)
+
+    args = parser.parse_args()
+
+    bookcorpus = load_dataset('bookcorpus')
+    train_split = bookcorpus["train"]
+    context = ""
+    for i in range(0, 20):
+        context += train_split[i]['text']
+
+    prompt = "What is 1 + 1?"
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=model.config.max_position_embeddings)
+    outputs = model(**inputs)
+
+    # Check what outputs contains and decode accordingly
+    if 'logits' in outputs:
+        decoded_answers = tokenizer.batch_decode(torch.argmax(outputs.logits, dim=-1), skip_special_tokens=True)
+    else:
+        decoded_answers = tokenizer.batch_decode(outputs[0], skip_special_tokens=True)
+
+    print(decoded_answers)
+
+
+    '''
     #pipe = pipeline("text-generation", model="meta-llama/Meta-Llama-3-8B-Instruct", token = access_token)
     # reload base model
     # Load the tokenizer and model
     #tokenizer = AutoTokenizer.from_pretrained(model_path, token=access_token)
     tokenizer = AutoTokenizer.from_pretrained(model_path, force_download=True,token=access_token)
+    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "right"
     model = AutoModelForCausalLM.from_pretrained(model_path, output_attentions=True, token=access_token)
     args = parser.parse_args()
     if args.finetune:
         # TODO: Put in finetuning code
         pass
     # Example text to encode
-    input_text = "Here is some example text to encode."
-    
-    # Tokenize the input
-    inputs = tokenizer(input_text, return_tensors="pt")
-
-    # Pass the tokenized input to the model and request attention matrices
+    bookcorpus = load_dataset('bookcorpus')
+    train_split = bookcorpus["train"]
+    context = ""
+    for i in range(0, 20):
+        context += train_split[i]['text']
+    #print(context)
+    prompt = "Summarize this text for me" + context
+    inputs = tokenizer(prompt, return_tensors="pt")
     outputs = model(**inputs)
+    decoded_answers = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+    print(decoded_answers)
+    #attentions = outputs.attentions  # Size (num_layers, batch_size, num_heads, sequence_length, sequence_length)
+    #plot_attention(attentions, layer=0, threshold=args.threshold) # plot attention for first layer
+
+    
+    #add code to make it handle batch size of more than 1
+        
+    
+    # Pass the tokenized input to the model and request attention matrices
+    #outputs = model(**inputs)
     
     # Extract attention matrices
-    attentions = outputs.attentions  # Size (num_layers, batch_size, num_heads, sequence_length, sequence_length)
-    plot_attention(attentions, layer=0, threshold=args.threshold) # plot attention for first layer
-
+    #attentions = outputs.attentions  # Size (num_layers, batch_size, num_heads, sequence_length, sequence_length)
+    #plot_attention(attentions, layer=0, threshold=args.threshold) # plot attention for first layer
+'''
 if __name__ == '__main__':
     main()
