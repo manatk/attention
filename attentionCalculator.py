@@ -1,11 +1,14 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, LlamaModel, LlamaTokenizer, LlamaConfig
+from transformers import LongformerModel, LongformerTokenizer
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 from datasets import load_dataset
+#maybe install sparseAttention package from Microsoft???
 
-model_path = "meta-llama/Meta-Llama-3-8B-Instruct"
+#model_path = "meta-llama/Meta-Llama-3-8B-Instruct"
+model_path = "allenai/longformer-base-4096"
 access_token = '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'
 
 parser = argparse.ArgumentParser(description='Choose whether to finetune or evaluate.')
@@ -55,7 +58,7 @@ attentions (Tuple of tensors) - Attention matrix that model outputs.
 layer (int) - layer to choose
 threshold (float) - threshold for alpha value over which a word is said to be attended to
 '''
-def plot_attention(attentions, layer, threshold, iter):
+def plot_attention(attentions, layer, threshold, iter, dataset_name):
     # Creating plot for layer
     # Iterate through each batch, head, and sequence
     batch_size, num_heads, seq_length = attentions[0].size()[0], attentions[0].size()[1], attentions[0].size()[2]
@@ -76,10 +79,10 @@ def plot_attention(attentions, layer, threshold, iter):
     plt.ylabel('Count of Words with Attention > ' + str(threshold))
     plt.title('Attention Visualization')
     plt.grid(True)
-    plt.savefig('attention_plots/layer=' + str(layer) + 'iter' + str(iter) + ',' +  'threshold=' + str(threshold) + '.png')
+    plt.savefig('attention_plots/' + dataset_name + 'layer=' + str(layer) + 'iter' + str(iter) + ',' +  'threshold=' + str(threshold) + '.png')
     #plt.show()
 
-def plotMultipleIterations(train_split, tokenizer, model, args):
+def plotMultipleIterations(train_split, tokenizer, model, args, dataset_name):
     for i in range(20):
         context = ""
         for j in range(20):
@@ -88,9 +91,9 @@ def plotMultipleIterations(train_split, tokenizer, model, args):
         inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=model.config.max_position_embeddings)
         outputs = model(**inputs)
         attentions = outputs.attentions  # Size (num_layers, batch_size, num_heads, sequence_length, sequence_length)
-        plot_attention(attentions, layer=0, threshold=args.threshold, iter=i) # plot attention for first layer
+        plot_attention(attentions, layer=0, threshold=args.threshold, iter=i, dataset_name=dataset_name) # plot attention for first layer
 
-def plotDifferentLayers(train_split, tokenizer, model, args):
+def plotDifferentLayersBookCorpus(train_split, tokenizer, model, args, dataset_name):
         context = ""    
         for j in range(20):
             context += train_split[j]['text']  # Adjust index to avoid repeats and use different sections
@@ -99,9 +102,60 @@ def plotDifferentLayers(train_split, tokenizer, model, args):
         outputs = model(**inputs)
         attentions = outputs.attentions  # Size (num_layers, batch_size, num_heads, sequence_length, sequence_length)
         for i in range(0, 32):
-            plot_attention(attentions, layer=i, threshold=args.threshold, iter=i) # plot attention for first layer
+            plot_attention(attentions, layer=i, threshold=args.threshold, iter=0, dataset_name=dataset_name) # plot attention for first layer
+
+def plotDiffIterationsStack(train_split, tokenizer, model, args):
+        the_stack = load_dataset("bigcode/the-stack", data_dir="data/python", streaming=True, split="train")
+        code = ""
+        count = 0
+        for sample in the_stack:
+            #print(sample["content"])
+            code += sample["content"]
+            prompt = code + " Summarize this text."
+            inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=model.config.max_position_embeddings)
+            outputs = model(**inputs)
+            attentions = outputs.attentions  # Size (num_layers, batch_size, num_heads, sequence_length, sequence_length)
+            for i in range(0, 32):
+                plot_attention(attentions, layer=i, threshold=args.threshold, iter=i) # plot attention for first layer    
+            count = count + 1
+            if count > 20:
+                break
+        
+
+def plotMultipleLayersStack(train_split, tokenizer, model, args):
+    the_stack = load_dataset("bigcode/the-stack", data_dir="data/python", streaming=True, split="train")
+    code = ""
+    for sample in the_stack:
+        #print(sample["content"])
+        code += sample["content"]
+        break
+    prompt = code + " What does this code do?"
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=model.config.max_position_embeddings)
+    outputs = model(**inputs)
+    attentions = outputs.attentions  # Size (num_layers, batch_size, num_heads, sequence_length, sequence_length)
+    for i in range(0, 32):
+        plot_attention(attentions, layer=i, threshold=args.threshold, iter=i, dataset_name="the_stack") # plot attention for first layer
+
+
 
 def main():
+    '''
+    tokenizer = LongformerTokenizer.from_pretrained('allenai/longformer-base-4096')
+    model = LongformerModel.from_pretrained('allenai/longformer-base-4096')
+    input_text = "test text for input."
+    inputs = tokenizer(input_text, return_tensors='pt', max_length=4096, truncation=True, padding=True)
+    attention_mask = torch.ones(inputs['input_ids'].shape, dtype=torch.long)
+    global_attention_mask = torch.zeros(inputs['input_ids'].shape, dtype=torch.long)
+    global_attention_mask[:, 0] = 1
+    outputs = model(input_ids=inputs['input_ids'],
+                    attention_mask=attention_mask,
+                    global_attention_mask=global_attention_mask,
+                    output_attentions=True)
+    attentions = outputs.attentions
+
+    # Print the attention matrices
+    plot_attention(attentions, 0, .5, 0, "testSparse")
+    '''
     tokenizer = AutoTokenizer.from_pretrained(model_path, force_download=True, token=access_token)
     tokenizer.pad_token = tokenizer.eos_token  # Ensure pad token is set if the model expects it
     tokenizer.padding_side = "right"
@@ -112,11 +166,11 @@ def main():
 
     bookcorpus = load_dataset('bookcorpus')
     train_split = bookcorpus["train"]
-    train_split = bookcorpus["train"]
-    #plotMultipleIterations(train_split, tokenizer, model, args)
-    plotDifferentLayers(train_split, tokenizer, model, args)
+    # plotMultipleLayersStack(train_split, tokenizer, model, args)
+    #plotMultipleIterations(train_split, tokenizer, model, args, "bookCorpus")
+    plotDifferentLayersBookCorpus(train_split, tokenizer, model, args, "BookCorpus")
     # Iterate over the dataset 20 times
-    
+
 
     '''
     if 'logits' in outputs:
