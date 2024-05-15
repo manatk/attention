@@ -55,25 +55,51 @@ attentions (Tuple of tensors) - Attention matrix that model outputs.
 layer (int) - layer to choose
 threshold (float) - threshold for alpha value over which a word is said to be attended to
 '''
-def plot_attention(attentions, layer, threshold):
+def plot_attention(attentions, layer, threshold, iter):
     # Creating plot for layer
     # Iterate through each batch, head, and sequence
     batch_size, num_heads, seq_length = attentions[0].size()[0], attentions[0].size()[1], attentions[0].size()[2]
-    points = [0 for i in range(seq_length)]
     attention_layer = attentions[layer].detach().numpy()
-    sums = np.sum(attention_layer, 2)
-    sums = np.putmask(sums, sums<threshold, 0)
-    counts = np.count_nonzero(sums, [0, 1, 3])
+    sums = np.sum(attention_layer, axis=2)  # Sum over the last axis to combine the attention over sequence length
+    sums = np.where(sums < threshold, 0, sums)  # Apply threshold and zero out the lower values
+
+    # Count non-zero values across batch and head dimensions
+    counts = np.count_nonzero(sums, axis=(0, 1))
+
     x_values = [i for i in range(seq_length)]
     y_values = counts
+
     # Plot the points
+    plt.clf()
     plt.scatter(x_values, y_values)
     plt.xlabel('Position in Sequence')
     plt.ylabel('Count of Words with Attention > ' + str(threshold))
     plt.title('Attention Visualization')
     plt.grid(True)
-    plt.savefig('attention_plots/layer=' + str(layer) + ',threshold=' + str(threshold) + '.png')
-    plt.show()
+    plt.savefig('attention_plots/layer=' + str(layer) + 'iter' + str(iter) + ',' +  'threshold=' + str(threshold) + '.png')
+    #plt.show()
+
+def plotMultipleIterations(train_split, tokenizer, model, args):
+    for i in range(20):
+        context = ""
+        for j in range(20):
+            context += train_split[i * 20 + j]['text']  # Adjust index to avoid repeats and use different sections
+        prompt = context + " Summarize this text."
+        inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=model.config.max_position_embeddings)
+        outputs = model(**inputs)
+        attentions = outputs.attentions  # Size (num_layers, batch_size, num_heads, sequence_length, sequence_length)
+        plot_attention(attentions, layer=0, threshold=args.threshold, iter=i) # plot attention for first layer
+
+def plotDifferentLayers(train_split, tokenizer, model, args):
+        context = ""    
+        for j in range(20):
+            context += train_split[j]['text']  # Adjust index to avoid repeats and use different sections
+        prompt = context + " Summarize this text."
+        inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=model.config.max_position_embeddings)
+        outputs = model(**inputs)
+        attentions = outputs.attentions  # Size (num_layers, batch_size, num_heads, sequence_length, sequence_length)
+        for i in range(0, 32):
+            plot_attention(attentions, layer=i, threshold=args.threshold, iter=i) # plot attention for first layer
 
 def main():
     tokenizer = AutoTokenizer.from_pretrained(model_path, force_download=True, token=access_token)
@@ -86,61 +112,17 @@ def main():
 
     bookcorpus = load_dataset('bookcorpus')
     train_split = bookcorpus["train"]
-    context = ""
-    for i in range(0, 20):
-        context += train_split[i]['text']
+    train_split = bookcorpus["train"]
+    #plotMultipleIterations(train_split, tokenizer, model, args)
+    plotDifferentLayers(train_split, tokenizer, model, args)
+    # Iterate over the dataset 20 times
+    
 
-    prompt = "What is 1 + 1?"
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=model.config.max_position_embeddings)
-    outputs = model(**inputs)
-
-    # Check what outputs contains and decode accordingly
+    '''
     if 'logits' in outputs:
         decoded_answers = tokenizer.batch_decode(torch.argmax(outputs.logits, dim=-1), skip_special_tokens=True)
     else:
         decoded_answers = tokenizer.batch_decode(outputs[0], skip_special_tokens=True)
-
-    print(decoded_answers)
-
-
     '''
-    #pipe = pipeline("text-generation", model="meta-llama/Meta-Llama-3-8B-Instruct", token = access_token)
-    # reload base model
-    # Load the tokenizer and model
-    #tokenizer = AutoTokenizer.from_pretrained(model_path, token=access_token)
-    tokenizer = AutoTokenizer.from_pretrained(model_path, force_download=True,token=access_token)
-    tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "right"
-    model = AutoModelForCausalLM.from_pretrained(model_path, output_attentions=True, token=access_token)
-    args = parser.parse_args()
-    if args.finetune:
-        # TODO: Put in finetuning code
-        pass
-    # Example text to encode
-    bookcorpus = load_dataset('bookcorpus')
-    train_split = bookcorpus["train"]
-    context = ""
-    for i in range(0, 20):
-        context += train_split[i]['text']
-    #print(context)
-    prompt = "Summarize this text for me" + context
-    inputs = tokenizer(prompt, return_tensors="pt")
-    outputs = model(**inputs)
-    decoded_answers = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-    print(decoded_answers)
-    #attentions = outputs.attentions  # Size (num_layers, batch_size, num_heads, sequence_length, sequence_length)
-    #plot_attention(attentions, layer=0, threshold=args.threshold) # plot attention for first layer
-
-    
-    #add code to make it handle batch size of more than 1
-        
-    
-    # Pass the tokenized input to the model and request attention matrices
-    #outputs = model(**inputs)
-    
-    # Extract attention matrices
-    #attentions = outputs.attentions  # Size (num_layers, batch_size, num_heads, sequence_length, sequence_length)
-    #plot_attention(attentions, layer=0, threshold=args.threshold) # plot attention for first layer
-'''
 if __name__ == '__main__':
     main()
