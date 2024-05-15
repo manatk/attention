@@ -80,8 +80,19 @@ def plot_attention(attentions, layer, threshold, iter, dataset_name):
     plt.savefig('attention_plots/' + dataset_name + 'layer=' + str(layer) + 'iter' + str(iter) + ',' +  'threshold=' + str(threshold) + '.png')
     #plt.show()
 
+# Functions for Book Corpus
+
 # TODO: DO we keep this?
-def plotMultipleIterations(train_split, tokenizer, model, args, dataset_name):
+'''
+Runs several iterations of training on the same data. Prints first layer of attention for each iteration.
+
+Params:
+train_split - Training data
+tokenizer - tokenizer
+model - model
+args - args given by user
+'''
+def plotDiffIterationsBookCorpus(train_split, tokenizer, model, args, dataset_name):
     for i in range(20):
         context = ""
         for j in range(20):
@@ -90,7 +101,7 @@ def plotMultipleIterations(train_split, tokenizer, model, args, dataset_name):
         inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=model.config.max_position_embeddings)
         outputs = model(**inputs)
         attentions = outputs.attentions  # Size (num_layers, batch_size, num_heads, sequence_length, sequence_length)
-        plot_attention(attentions, layer=0, threshold=args.threshold, iter=i, dataset_name=dataset_name) # plot attention
+        plot_attention(attentions, layer=0, threshold=args.threshold, iter=i, dataset_name="BooksCorpus") # plot attention
 
 '''
 Trains model on training data, with task being to summarize text. Then plots attention matrix for each layer.
@@ -113,6 +124,7 @@ def plotDifferentLayersBookCorpus(train_split, tokenizer, model, args):
         for i in range(len(attentions)):
             plot_attention(attentions, layer=i, threshold=args.threshold, iter=0, dataset_name="BooksCorpus") # plot attention
 
+# Functions for Stack
 
 # TODO: Do we keep this function?
 def plotDiffIterationsStack(train_split, tokenizer, model, args):
@@ -187,7 +199,7 @@ def main():
     bookcorpus = load_dataset('bookcorpus')
     train_split = bookcorpus["train"]
     # plotDifferentLayersStack(train_split, tokenizer, model, args)
-    #plotMultipleIterations(train_split, tokenizer, model, args, "bookCorpus")
+    #plotDiffIterationsBookCorpus(train_split, tokenizer, model, args, "bookCorpus")
     plotDifferentLayersBookCorpus(train_split, tokenizer, model, args)
     # Iterate over the dataset 20 times
 
