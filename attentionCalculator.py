@@ -39,7 +39,6 @@ attentions (Tuple of tensors) - Attention matrix that model outputs.
 layer (int) - layer to choose
 '''
 def print_attention_sums(attentions, layer):
-    # Creating plot for first layer
     # Iterate through each batch, head, and sequence
     batch_size, num_heads, seq_length = attentions[0].size()[0], attentions[0].size()[1], attentions[0].size()[2]
     points = [0 for i in range(seq_length)]
@@ -59,7 +58,6 @@ layer (int) - layer to choose
 threshold (float) - threshold for alpha value over which a word is said to be attended to
 '''
 def plot_attention(attentions, layer, threshold, iter, dataset_name):
-    # Creating plot for layer
     # Iterate through each batch, head, and sequence
     batch_size, num_heads, seq_length = attentions[0].size()[0], attentions[0].size()[1], attentions[0].size()[2]
     attention_layer = attentions[layer].detach().numpy()
@@ -82,6 +80,7 @@ def plot_attention(attentions, layer, threshold, iter, dataset_name):
     plt.savefig('attention_plots/' + dataset_name + 'layer=' + str(layer) + 'iter' + str(iter) + ',' +  'threshold=' + str(threshold) + '.png')
     #plt.show()
 
+# TODO: DO we keep this?
 def plotMultipleIterations(train_split, tokenizer, model, args, dataset_name):
     for i in range(20):
         context = ""
@@ -91,9 +90,19 @@ def plotMultipleIterations(train_split, tokenizer, model, args, dataset_name):
         inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=model.config.max_position_embeddings)
         outputs = model(**inputs)
         attentions = outputs.attentions  # Size (num_layers, batch_size, num_heads, sequence_length, sequence_length)
-        plot_attention(attentions, layer=0, threshold=args.threshold, iter=i, dataset_name=dataset_name) # plot attention for first layer
+        plot_attention(attentions, layer=0, threshold=args.threshold, iter=i, dataset_name=dataset_name) # plot attention
 
-def plotDifferentLayersBookCorpus(train_split, tokenizer, model, args, dataset_name):
+'''
+Trains model on training data, with task being to summarize text. Then plots attention matrix for each layer.
+
+Parameters:
+train_split - training data, stored as 2D array
+tokenizer - tokenizer
+model - model
+args - args given by user
+
+'''
+def plotDifferentLayersBookCorpus(train_split, tokenizer, model, args):
         context = ""    
         for j in range(20):
             context += train_split[j]['text']  # Adjust index to avoid repeats and use different sections
@@ -101,9 +110,11 @@ def plotDifferentLayersBookCorpus(train_split, tokenizer, model, args, dataset_n
         inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=model.config.max_position_embeddings)
         outputs = model(**inputs)
         attentions = outputs.attentions  # Size (num_layers, batch_size, num_heads, sequence_length, sequence_length)
-        for i in range(0, 32):
-            plot_attention(attentions, layer=i, threshold=args.threshold, iter=0, dataset_name=dataset_name) # plot attention for first layer
+        for i in range(len(attentions)):
+            plot_attention(attentions, layer=i, threshold=args.threshold, iter=0, dataset_name="BooksCorpus") # plot attention
 
+
+# TODO: Do we keep this function?
 def plotDiffIterationsStack(train_split, tokenizer, model, args):
         the_stack = load_dataset("bigcode/the-stack", data_dir="data/python", streaming=True, split="train")
         code = ""
@@ -115,14 +126,23 @@ def plotDiffIterationsStack(train_split, tokenizer, model, args):
             inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=model.config.max_position_embeddings)
             outputs = model(**inputs)
             attentions = outputs.attentions  # Size (num_layers, batch_size, num_heads, sequence_length, sequence_length)
-            for i in range(0, 32):
-                plot_attention(attentions, layer=i, threshold=args.threshold, iter=i) # plot attention for first layer    
+            for i in range(len(attentions)):
+                plot_attention(attentions, layer=i, threshold=args.threshold, iter=i, dataset_name="the_stack") # plot attention  
             count = count + 1
             if count > 20:
                 break
         
+#TODO: train_split doesn't even appear in this function? You should load the training data in the main file.
+'''
+Trains model on training data, with task being to explain function of code.  Then plots attention matrix for each layer.
 
-def plotMultipleLayersStack(train_split, tokenizer, model, args):
+Parameters:
+train_split - training data, stored as 2D array
+tokenizer - tokenizer
+model - model
+args - args given by user
+'''
+def plotDifferentLayersStack(train_split, tokenizer, model, args):
     the_stack = load_dataset("bigcode/the-stack", data_dir="data/python", streaming=True, split="train")
     code = ""
     for sample in the_stack:
@@ -133,7 +153,7 @@ def plotMultipleLayersStack(train_split, tokenizer, model, args):
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=model.config.max_position_embeddings)
     outputs = model(**inputs)
     attentions = outputs.attentions  # Size (num_layers, batch_size, num_heads, sequence_length, sequence_length)
-    for i in range(0, 32):
+    for i in range(len(attentions)):
         plot_attention(attentions, layer=i, threshold=args.threshold, iter=i, dataset_name="the_stack") # plot attention for first layer
 
 
@@ -166,9 +186,9 @@ def main():
 
     bookcorpus = load_dataset('bookcorpus')
     train_split = bookcorpus["train"]
-    # plotMultipleLayersStack(train_split, tokenizer, model, args)
+    # plotDifferentLayersStack(train_split, tokenizer, model, args)
     #plotMultipleIterations(train_split, tokenizer, model, args, "bookCorpus")
-    plotDifferentLayersBookCorpus(train_split, tokenizer, model, args, "BookCorpus")
+    plotDifferentLayersBookCorpus(train_split, tokenizer, model, args)
     # Iterate over the dataset 20 times
 
 
