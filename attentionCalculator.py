@@ -49,6 +49,21 @@ def print_attention_sums(attentions, layer):
                 # Calculate the sum of attention values for the current word
                 attention_sum = np.sum(attention_layer[batch, head, :,seq_pos])
                 print(attention_sum)
+
+'''
+Creates attention mask for all layers such that all words whose sum of alpha values is less than threshold are dropped out.
+
+Params:
+attentions (Tuple of tensors) - Attention matrix that model outputs
+threshold - threshold under which elements are dropped out
+'''
+def create_attention_mask(attentions, threshold):
+    batch_size, num_heads, seq_length = attentions[0].size()[0], attentions[0].size()[1], attentions[0].size()[2]
+    attentions = np.stack([attentions[l].detach().numpy() for l in len(attentions)])
+    sums = np.sum(attentions, axis=3)  # Sum over the last axis to combine the attention over sequence length
+    sums = np.where(sums < threshold, 0, 1)  # Apply threshold and zero out the lower values: should be Size(batch_size, num_heads, seq_length)
+    return np.repeat(sums[:,:,:,:,np.newaxis], seq_length, 4)
+    
 '''
 Creates attention plot for a given layer.
 
@@ -62,7 +77,7 @@ def plot_attention(attentions, layer, threshold, iter, dataset_name):
     batch_size, num_heads, seq_length = attentions[0].size()[0], attentions[0].size()[1], attentions[0].size()[2]
     attention_layer = attentions[layer].detach().numpy()
     sums = np.sum(attention_layer, axis=2)  # Sum over the last axis to combine the attention over sequence length
-    sums = np.where(sums < threshold, 0, sums)  # Apply threshold and zero out the lower values
+    sums = np.where(sums < threshold, 0, sums)  # Apply threshold and zero out the lower values: should be Size(batch_size, num_heads, seq_length)
 
     # Count non-zero values across batch and head dimensions
     counts = np.count_nonzero(sums, axis=(0, 1))
