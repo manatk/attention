@@ -62,7 +62,7 @@ def create_attention_mask(attentions, threshold):
     attentions = np.stack([attentions[l].detach().numpy() for l in len(attentions)])
     sums = np.sum(attentions, axis=3)  # Sum over the last axis to combine the attention over sequence length
     sums = np.where(sums < threshold, 0, 1)  # Apply threshold and zero out the lower values: should be Size(batch_size, num_heads, seq_length)
-    return np.repeat(sums[:,:,:,:,np.newaxis], seq_length, 4)
+    return np.repeat(sums[:,:,:,:,np.newaxis], seq_length, 3)
     
 '''
 Creates attention plot for a given layer.
