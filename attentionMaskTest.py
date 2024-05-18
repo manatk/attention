@@ -21,7 +21,7 @@ def create_attention_mask(attentions, threshold):
     sums = np.sum(attentions_np, axis=3)
     masks = np.where(sums < threshold, 0, 1)
     attention_masks = np.repeat(masks[:, :, :, np.newaxis], seq_length, axis=3)
-    return attention_masks
+    return torch.from_numpy(attention_masks)
 
 class CustomLlamaModel(LlamaModel):
     def __init__(self, config):
@@ -31,7 +31,7 @@ class CustomLlamaModel(LlamaModel):
     def forward(self, inputs_embeds=None, attention_masks=None, position_ids=None, **kwargs):
         all_hidden_states = []
 
-        hidden_states = inputs_embeds
+        hidden_states = inputs_embeds # What is the size of hidden_states?
         for i, layer_module in enumerate(self.layers):
             if attention_masks is not None and i < len(attention_masks):
                 attention_mask = attention_masks[i].sum(dim=1).unsqueeze(-1).to(hidden_states.device)
