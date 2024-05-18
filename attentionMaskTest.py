@@ -6,6 +6,15 @@ import argparse
 model_path = "meta-llama/Meta-Llama-3-8B-Instruct"
 access_token = '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'
 
+'''
+Creates attention mask for all layers such that all words whose sum of alpha values is less than threshold are dropped out.
+
+Params:
+attentions (Tuple of tensors) - Attention matrix that model outputs
+threshold - threshold under which elements are dropped out
+
+Returns tensor of size [layer_size, batch_size, num_heads, seq_length, seq_length]
+'''
 def create_attention_mask(attentions, threshold):
     batch_size, num_heads, seq_length = attentions[0].size(0), attentions[0].size(1), attentions[0].size(2)
     attentions_np = np.stack([attn.detach().cpu().numpy() for attn in attentions])
