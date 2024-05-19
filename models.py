@@ -20,8 +20,6 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-import attention
-
 torch.manual_seed(0)
 
 class MultiHeadSelfAttention(nn.Module):
