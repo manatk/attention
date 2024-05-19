@@ -184,7 +184,6 @@ def plotDifferentLayersStack(train_split, tokenizer, model, args):
         plot_attention(attentions, layer=i, threshold=args.threshold, iter=i, dataset_name="the_stack") # plot attention for first layer
 
 
-
 def main():
     '''
     tokenizer = LongformerTokenizer.from_pretrained('allenai/longformer-base-4096')
