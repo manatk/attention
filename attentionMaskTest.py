@@ -7,20 +7,21 @@ model_path = "meta-llama/Meta-Llama-3-8B-Instruct"
 access_token = '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'
 
 '''
-Params: This function takes in the attention masks which are outputted by the first forward pass of the model and a threshold value.
-Returns: A list of attention masks for each layer of the model.
+Creates attention mask for all layers such that all words whose sum of alpha values is less than threshold are dropped out.
 
-This function is called after we make our initial call to the model and get the attentions that it is using. We will retain as few
-tokens as required such that the sum of the attention weights >= the threshold value
+Params:
+attentions (Tuple of tensors) - Attention matrix that model outputs
+threshold - threshold under which elements are dropped out
+
+Returns tensor of size [layer_size, batch_size, num_heads, seq_length, seq_length]
 '''
-
 def create_attention_mask(attentions, threshold):
     batch_size, num_heads, seq_length = attentions[0].size(0), attentions[0].size(1), attentions[0].size(2)
     attentions_np = np.stack([attn.detach().cpu().numpy() for attn in attentions])
     sums = np.sum(attentions_np, axis=3)
     masks = np.where(sums < threshold, 0, 1)
     attention_masks = np.repeat(masks[:, :, :, np.newaxis], seq_length, axis=3)
-    return attention_masks
+    return torch.from_numpy(attention_masks)
 
 
 class CustomLlamaModel(LlamaModel):
@@ -35,7 +36,7 @@ class CustomLlamaModel(LlamaModel):
         # we need to return the final output and all the hidden states
         all_hidden_states = []
 
-        hidden_states = inputs_embeds
+        hidden_states = inputs_embeds # What is the size of hidden_states?
         for i, layer_module in enumerate(self.layers):
             if attention_masks is not None and i < len(attention_masks):
                 attention_mask = attention_masks[i].sum(dim=1).unsqueeze(-1).to(hidden_states.device)
