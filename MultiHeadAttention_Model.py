@@ -2,6 +2,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, GPT2Model, GPT2Con
 import torch
 import numpy as np
 import argparse
+import models
 
 print("Starting script...")
 
@@ -27,40 +28,6 @@ def create_attention_mask(attentions, threshold):
     attention_masks = np.repeat(masks[:, :, :, np.newaxis], seq_length, axis=3)
     print("Attention masks created.")
     return torch.from_numpy(attention_masks).to(attentions[0].device)
-
-
-class CustomGPT2Model(GPT2Model):
-    def __init__(self, config):
-        print("Initializing CustomGPT2Model...")
-        super(CustomGPT2Model, self).__init__(config)
-        print("CustomGPT2Model initialized.")
-    
-    def forward(self, attention_masks, inputs_embeds=None, **kwargs):
-        print("Starting forward pass in CustomGPT2Model...")
-        all_hidden_states = []
-        hidden_states = inputs_embeds
-        
-        for i, layer_module in enumerate(self.h):
-            print(f"Processing layer {i}...")
-            if attention_masks is not None and i < len(attention_masks):
-                attention_mask = attention_masks[i]
-                print(f"Applied attention mask for layer {i}.")
-            else:
-                attention_mask = None
-            
-            layer_outputs = layer_module(
-                hidden_states,
-                attention_mask=attention_mask,
-                **kwargs
-            )
-            hidden_states = layer_outputs[0]
-            all_hidden_states.append(hidden_states)
-            print(f"Layer {i} processed.")
-        
-        hidden_states = self.ln_f(hidden_states)
-        all_hidden_states.append(hidden_states)
-        print("Forward pass in CustomGPT2Model completed.")
-        return hidden_states, all_hidden_states
 
 print("Setting up argument parser...")
 parser = argparse.ArgumentParser(description='Choose whether to finetune or evaluate.')
@@ -115,7 +82,7 @@ def main():
 
     print("Loading custom model configuration...")
     config = GPT2Config.from_pretrained(model_path)
-    model_custom = CustomGPT2Model.from_pretrained(model_path, config=config).to(device)
+    model_custom = models.CustomMultiHeadAttentionGPT(model_path, config=config).to(device)
     print("Custom model loaded and moved to device.")
 
     print("Running custom forward pass...")
