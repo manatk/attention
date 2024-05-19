@@ -25,6 +25,7 @@ torch.manual_seed(0)
 class MultiHeadSelfAttention(nn.Module):
     def __init__(self, config):
         super(MultiHeadSelfAttention, self).__init__()
+        self.attention_mask = config.attention_mask
         self.num_heads = config.num_heads
         self.head_dim = config.hidden_size // config.num_heads
         self.all_head_dim = self.num_heads * self.head_dim
@@ -37,7 +38,7 @@ class MultiHeadSelfAttention(nn.Module):
         self.attn_dropout = nn.Dropout(config.attention_probs_dropout_prob)
         self.proj_dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def forward(self, hidden_states, attention_masks=None, **kwargs):
+    def forward(self, hidden_states,  **kwargs):
         batch_size, seq_length, hidden_size = hidden_states.size()
 
         # Linear projections to obtain Q, K, V
@@ -52,8 +53,8 @@ class MultiHeadSelfAttention(nn.Module):
 
         # Scaled dot-product attention
         attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2)) / math.sqrt(self.head_dim)
-        if attention_mask is not None:
-            attention_scores = attention_scores * attention_mask
+        if self.attention_mask is not None:
+            attention_scores = attention_scores * self.attention_mask
 
         attention_probs = nn.Softmax(dim=-1)(attention_scores)
         attention_probs = self.attn_dropout(attention_probs)

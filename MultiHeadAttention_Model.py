@@ -82,6 +82,7 @@ def main():
 
     print("Loading custom model configuration...")
     config = GPT2Config.from_pretrained(model_path)
+    config.attention_mask = attention_masks[0]
     model_custom = models.CustomMultiHeadAttentionGPT(model_path, config=config).to(device)
     print("Custom model loaded and moved to device.")
 
