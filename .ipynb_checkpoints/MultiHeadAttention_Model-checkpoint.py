@@ -56,40 +56,48 @@ def main():
     print(f"Tokenizing prompt: {prompt}")
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=model.config.n_positions).to(device)
     print(f"Inputs: {inputs}")
+
     print("Moving model to device...")
     model.to(device)
     print("Generating model outputs...")
     outputs = model(**inputs)
     attentions = outputs.attentions
     print(f"Model outputs generated. Attentions: {attentions}")
+
     print("Creating attention masks...")
-    attention_masks = create_attention_mask(attentions, args.threshold).to(device)
+    attention_masks = create_attention_mask(attentions, args.threshold)
     #print(f"Attention masks: {attention_masks}")
 
     input_ids = inputs['input_ids']
     #print(f"Generating embeddings for input IDs: {input_ids}")
     embeddings = model.get_input_embeddings()(input_ids)
-    embeddings = embeddings.to(device)
     #print(f"Embeddings: {embeddings}")
 
     print("Loading custom model configuration...")
-    config = models.GPTConfig(50257, 1024, n_layer=len(attention_masks), n_head=attention_masks.size()[2], n_embd=embeddings.size()[2])
+    config = GPT2Config(vocab_size=50257, block_size=1024)
+    config.n_layers = len(attention_masks)
     config.attention_masks = attention_masks
-    model_custom = models.CustomGPT(config)
+    pdb.set_trace()
+    model_custom = models.CustomMultiHeadAttentionGPT(config)
     model_custom = model_custom.to(device)
     print("Custom model loaded and moved to device.")
+
     print("Running custom forward pass...")
-    output = model_custom(embeddings)[0]
+    output = model_custom(embeddings)
+    with torch.no_grad():
+        final_output, loss = model_custom(idx=input_ids)
     print("Custom forward pass completed.")
 
     print("Final Model Output:")
-    token_ids = torch.argmax(output, dim=-1)
+    token_ids = torch.argmax(final_output, dim=-1)
 
-    print(output)
+    print(final_output)
     decoded_output = tokenizer.decode(token_ids[0], skip_special_tokens=True)
 
     print("Final Model Output:")
     print(decoded_output)
+    print("Loss:")
+    print(loss)
 
     print("Main function completed.")
 

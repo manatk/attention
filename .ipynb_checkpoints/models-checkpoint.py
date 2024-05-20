@@ -21,6 +21,7 @@ class MultiHeadSelfAttention(nn.Module):
         self.proj_dropout = nn.Dropout(config.resid_pdrop) 
 
     def forward(self, hidden_states, attention_mask=None):
+        pdb.set_trace()
         batch_size, seq_length, hidden_size = hidden_states.size()
 
         # Linear projections to obtain Q, K, V
@@ -75,6 +76,7 @@ class Block(nn.Module):
         self.ln1 = nn.LayerNorm(config.n_embd)
         self.ln2 = nn.LayerNorm(config.n_embd)
         self.attn = MultiHeadSelfAttention(config)
+        self.n_attn_layers = len(config.attention_masks)
         self.mlp = nn.Sequential(
             nn.Linear(config.n_embd, 4 * config.n_embd),
             nn.GELU(),
@@ -89,17 +91,19 @@ class Block(nn.Module):
         x = x + self.mlp(self.ln2(x))
         return x
 
-class CustomGPT(nn.Module):
+class CustomMultiHeadAttentionGPT(nn.Module):
     """The full GPT language model, with a context size of block_size"""
 
     def __init__(self, config):
         super().__init__()
 
         # Input embedding stem
+        self.tok_emb = nn.Embedding(config.vocab_size, config.n_embd)
+        self.pos_emb = nn.Parameter(torch.zeros(1, config.block_size, config.n_embd))
         self.drop = nn.Dropout(config.embd_pdrop)
 
         # Transformer
-        self.blocks =  nn.Sequential(*[Block(config) for _ in range(config.n_layer)])
+        self.blocks = [Block(config) for _ in range(config.n_layer)]
 
         # Decoder head
         self.ln_f = nn.LayerNorm(config.n_embd)
@@ -123,9 +127,18 @@ class CustomGPT(nn.Module):
     def get_block_size(self):
         return self.block_size
 
-    def forward(self, x_input, targets=None):
+    def forward(self, idx, attention_masks=None, targets=None):
+        b, t = idx.size()
+        assert t <= self.block_size, f"Cannot forward, model block size ({t}, {self.block_size}) is exhausted."
+
+        # Forward the GPT model
+        token_embeddings = self.tok_emb(idx)  # Each index maps to a (learnable) vector
+        position_embeddings = self.pos_emb[:, :t, :]  # Each position maps to a (learnable) vector
+        x_input = token_embeddings + position_embeddings
+
         x = self.drop(x_input)
-        x = self.blocks(x)
+        for block in self.blocks:
+            x = block(x)
         '''for i, block in enumerate(self.blocks):
             pdb.set_trace()
             x = block(x, attention_mask=self.attention_masks[i] if attention_masks is not None else None)  # Pass the specific mask
